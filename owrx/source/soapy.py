@@ -4,6 +4,8 @@ from owrx.source.connector import ConnectorSource, ConnectorDeviceDescription
 from typing import List
 from owrx.form.input import Input, TextInput
 from owrx.form.input.device import GainInput
+from owrx.form.input.converter import OptionalConverter
+from owrx.form.input.validator import RequiredValidator
 from owrx.soapy import SoapySettings
 
 
@@ -31,7 +33,7 @@ class SoapyConnectorSource(ConnectorSource, metaclass=ABCMeta):
         pass
 
     def getEventNames(self):
-        return super().getEventNames() + list(self.getSoapySettingsMappings().keys())
+        return super().getEventNames() + list(self.getSoapySettingsMappings().keys()) + ["injected_soapy_remote"]
 
     def buildSoapyDeviceParameters(self, parsed, values):
         """
@@ -39,7 +41,12 @@ class SoapyConnectorSource(ConnectorSource, metaclass=ABCMeta):
         this prevents the soapy_connector from using the wrong device in scenarios where there's no same-type sdrs.
         """
         parsed = [v for v in parsed if "driver" not in v]
-        parsed += [{"driver": self.getDriver()}]
+
+        if "injected_soapy_remote" in values:
+            parsed += [{"driver": "remote", "remote:driver": self.getDriver(), "remote": values["injected_soapy_remote"]}]
+        else:
+            parsed += [{"driver": self.getDriver()}]
+
         return parsed
 
     def getSoapySettingsMappings(self):
@@ -96,10 +103,17 @@ class SoapyConnectorDeviceDescription(ConnectorDeviceDescription):
                 has_agc=self.hasAgc(),
             ),
             TextInput("antenna", "Antenna"),
+            TextInput(
+                "injected_soapy_remote",
+                "SoapySDRServer IP and Port",
+                infotext="SoapySDRServer hostname or IP and port to connect to. Format = IP:Port",
+                converter=OptionalConverter(),
+                validator=RequiredValidator(),
+            ),
         ]
 
     def getDeviceOptionalKeys(self):
-        return super().getDeviceOptionalKeys() + ["device", "rf_gain", "antenna"]
+        return super().getDeviceOptionalKeys() + ["device", "rf_gain", "antenna", "injected_soapy_remote"]
 
     def getProfileOptionalKeys(self):
         return super().getProfileOptionalKeys() + ["antenna"]
